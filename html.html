@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>HTML Runner Pro</title>
+  <link rel="icon" type="image/png" href="1.png">
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", sans-serif;
+      background: #1e1e1e;
+      color: #eee;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      background: #252526;
+      border-bottom: 1px solid #333;
+    }
+    header select, header button {
+      padding: 6px 12px;
+      border-radius: 4px;
+      border: none;
+      font-size: 14px;
+    }
+    select {
+      background: #2d2d30;
+      color: #eee;
+    }
+    button {
+      background: dodgerblue;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover { background: royalblue; }
+    #editors {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 50px);
+    }
+    .editor {
+      flex: 1;
+      border-top: 1px solid #333;
+    }
+    .hidden { display: none; }
+    .label {
+      background: #2d2d30;
+      color: #ccc;
+      padding: 4px 10px;
+      font-size: 13px;
+      border-bottom: 1px solid #333;
+    }
+  </style>
+
+  <!-- Monaco Editor -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+</head>
+<body>
+  <header>
+    <label for="mode">Mode:</label>
+    <select id="mode">
+      <option value="combined">Gabungan</option>
+      <option value="separated">Terpisah</option>
+    </select>
+
+    <label for="theme">Tema:</label>
+    <select id="theme">
+      <option value="vs">Terang</option>
+      <option value="vs-dark" selected>Dark Mode</option>
+      <option value="modern-light">Modern Cerah</option>
+      <option value="modern-dark">Modern Gelap</option>
+      <option value="hacker">Hacker</option>
+    </select>
+
+    <button onclick="runCode()">Tampilkan</button>
+  </header>
+
+  <div id="editors">
+    <!-- Gabungan -->
+    <div id="editor-combined" class="editor"></div>
+
+    <!-- Terpisah -->
+    <div class="label hidden" id="label-html">HTML</div>
+    <div id="editor-html" class="editor hidden"></div>
+    <div class="label hidden" id="label-css">CSS</div>
+    <div id="editor-css" class="editor hidden"></div>
+    <div class="label hidden" id="label-js">JS</div>
+    <div id="editor-js" class="editor hidden"></div>
+  </div>
+
+  <script>
+    let previewTab = null;
+    let editorCombined, editorHTML, editorCSS, editorJS;
+
+    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' }});
+    require(["vs/editor/editor.main"], function () {
+      // custom themes
+      monaco.editor.defineTheme("modern-light", {
+        base: "vs",
+        inherit: true,
+        rules: [
+          { token: "", foreground: "2c3e50", background: "ecf0f1" },
+          { token: "keyword", foreground: "2980b9", fontStyle: "bold" },
+          { token: "string", foreground: "27ae60" },
+          { token: "number", foreground: "8e44ad" }
+        ],
+        colors: {
+          "editor.background": "#ecf0f1",
+          "editor.lineHighlightBackground": "#dfe6e9",
+          "editorCursor.foreground": "#e74c3c"
+        }
+      });
+
+      monaco.editor.defineTheme("modern-dark", {
+        base: "vs-dark",
+        inherit: true,
+        rules: [
+          { token: "", foreground: "ecf0f1", background: "2c3e50" },
+          { token: "keyword", foreground: "e67e22", fontStyle: "bold" },
+          { token: "string", foreground: "2ecc71" },
+          { token: "number", foreground: "9b59b6" }
+        ],
+        colors: {
+          "editor.background": "#2c3e50",
+          "editorCursor.foreground": "#f1c40f"
+        }
+      });
+
+      monaco.editor.defineTheme("hacker", {
+        base: "vs-dark",
+        inherit: true,
+        rules: [
+          { token: "", foreground: "00ff00", background: "000000" },
+          { token: "keyword", foreground: "00ff00", fontStyle: "bold" },
+          { token: "string", foreground: "33ff33" },
+          { token: "number", foreground: "55ff55" }
+        ],
+        colors: {
+          "editor.background": "#000000",
+          "editorCursor.foreground": "#00ff00"
+        }
+      });
+
+      // Editor gabungan
+      editorCombined = monaco.editor.create(document.getElementById("editor-combined"), {
+        value: "",
+        language: "html",
+        theme: "vs-dark",
+        automaticLayout: true,
+        fontSize: 14,
+        minimap: { enabled: false }
+      });
+
+      // Editor terpisah
+      editorHTML = monaco.editor.create(document.getElementById("editor-html"), {
+        value: "",
+        language: "html",
+        theme: "vs-dark",
+        automaticLayout: true,
+        fontSize: 14,
+        minimap: { enabled: false }
+      });
+      editorCSS = monaco.editor.create(document.getElementById("editor-css"), {
+        value: "",
+        language: "css",
+        theme: "vs-dark",
+        automaticLayout: true,
+        fontSize: 14,
+        minimap: { enabled: false }
+      });
+      editorJS = monaco.editor.create(document.getElementById("editor-js"), {
+        value: "",
+        language: "javascript",
+        theme: "vs-dark",
+        automaticLayout: true,
+        fontSize: 14,
+        minimap: { enabled: false }
+      });
+
+      // auto-run semua editor
+      [editorCombined, editorHTML, editorCSS, editorJS].forEach(ed => {
+        ed.onDidChangeModelContent(() => {
+          if (previewTab && !previewTab.closed) runCode();
+        });
+      });
+    });
+
+    function runCode() {
+      const mode = document.getElementById("mode").value;
+      let code = "";
+
+      if (mode === "combined") {
+        code = editorCombined.getValue();
+      } else {
+        const html = editorHTML.getValue();
+        const css = `<style>${editorCSS.getValue()}</style>`;
+        const js = `<script>${editorJS.getValue()}<\/script>`;
+        code = `<!DOCTYPE html><html><head>${css}</head><body>${html}${js}</body></html>`;
+      }
+
+      if (!previewTab || previewTab.closed) {
+        previewTab = window.open();
+      }
+      previewTab.document.open();
+      previewTab.document.write(code);
+      previewTab.document.close();
+    }
+
+    // Ganti mode editor
+    document.getElementById("mode").addEventListener("change", function() {
+      const mode = this.value;
+      if (mode === "combined") {
+        document.getElementById("editor-combined").classList.remove("hidden");
+        ["html","css","js"].forEach(id=>{
+          document.getElementById("editor-"+id).classList.add("hidden");
+          document.getElementById("label-"+id).classList.add("hidden");
+        });
+      } else {
+        document.getElementById("editor-combined").classList.add("hidden");
+        ["html","css","js"].forEach(id=>{
+          document.getElementById("editor-"+id).classList.remove("hidden");
+          document.getElementById("label-"+id).classList.remove("hidden");
+        });
+      }
+    });
+
+    // Ganti tema editor
+    document.getElementById("theme").addEventListener("change", function() {
+      const theme = this.value;
+      monaco.editor.setTheme(theme);
+    });
+  </script>
+</body>
+</html>
