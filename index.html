@@ -4,277 +4,244 @@
   <meta charset="UTF-8" />
   <title>Codingin</title>
   <link rel="icon" type="image/png" href="1.png">
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: "Segoe UI", sans-serif;
+      font-family: Arial, sans-serif;
       background: #1e1e1e;
       color: #eee;
-      height: 100vh;
       display: flex;
       flex-direction: column;
+      height: 100vh;
     }
     header {
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 8px;
+      justify-content: space-between;
+      padding: 10px 16px;
       background: #2c2c2c;
       border-bottom: 1px solid #444;
-      flex-wrap: wrap;
+    }
+    header img {
+      height: 28px;
     }
     header button {
-      padding: 6px 12px;
+      background: dodgerblue;
       border: none;
+      padding: 6px 12px;
       border-radius: 4px;
-      cursor: pointer;
+      color: white;
       font-size: 14px;
+      cursor: pointer;
     }
     header button:hover { opacity: 0.9; }
-    .btn-primary { background: dodgerblue; color: white; }
-    .btn-secondary { background: seagreen; color: white; }
-    .btn-danger { background: crimson; color: white; }
 
-    #tab-bar {
+    #file-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+    }
+    .file-item {
       display: flex;
       align-items: center;
-      gap: 6px;
-      overflow-x: auto;
-      background: #222;
-      padding: 6px;
-      border-bottom: 1px solid #333;
-      min-height: 44px;
-      -webkit-overflow-scrolling: touch;
-    }
-    .tab {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 10px;
+      justify-content: space-between;
       background: #333;
-      color: #ccc;
+      padding: 8px 12px;
+      margin-bottom: 6px;
       border-radius: 6px;
       cursor: pointer;
-      white-space: nowrap;
-      height: 32px;
-      line-height: 1;
-      user-select: none;
     }
-    .tab.active { background: dodgerblue; color: #fff; }
-    .tab .close {
-      font-weight: bold;
-      margin-left: 6px;
+    .file-item:hover { background: #444; }
+    .file-name {
+      flex: 1;
+    }
+    .actions {
+      display: flex;
+      gap: 8px;
+    }
+    .icon-btn {
       cursor: pointer;
+      font-size: 16px;
+      background: none;
+      border: none;
+      color: #ccc;
     }
-    .tab input.tab-rename-input {
+    .icon-btn:hover { color: white; }
+
+    .rename-input {
       background: #555;
-      color: #fff;
       border: none;
       border-radius: 4px;
-      padding: 2px 6px;
-      font-size: 13px;
-      height: 26px;
-      outline: none;
-      min-width: 80px;
+      padding: 4px 6px;
+      color: white;
+      font-size: 14px;
+      width: 150px;
     }
 
-    #editor-area, #preview-area {
-      flex: 1;
+    /* konfirmasi popup */
+    #confirm-popup {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
       display: none;
-      min-height: 0;
-    }
-    #editor-area.active, #preview-area.active { display: block; }
-    #preview-area {
-      background: #fff;
-      color: #000;
-      overflow: auto;
-      position: relative;
-      width: 100%;
-      height: 100%;
-    }
-    #back-btn {
-      position: absolute;
-      top: 10px;
-      left: 10px;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.6);
       z-index: 1000;
-      padding: 6px 12px;
-      background: crimson;
+    }
+    #confirm-box {
+      background: #2c2c2c;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
       color: white;
+      max-width: 300px;
+    }
+    #confirm-box button {
+      margin: 10px 6px 0;
+      padding: 6px 12px;
       border: none;
       border-radius: 4px;
       cursor: pointer;
     }
-    @media (max-width: 480px) {
-      #tab-bar { padding: 4px; min-height: 40px; }
-      .tab { padding: 5px 8px; height: 30px; font-size: 13px; }
-      header button { padding: 6px 8px; font-size: 13px; }
-    }
+    #confirm-yes { background: crimson; color: white; }
+    #confirm-no { background: #555; color: white; }
   </style>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+  <!-- Firebase v8 -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 </head>
 <body>
-  <header id="header">
-    <button class="btn-primary" onclick="showPreviewSameTab()">Tampilkan</button>
-    <button class="btn-secondary" onclick="showPreviewNewTab()">Tampilkan di Tab Baru</button>
-    <button class="btn-danger" onclick="addTab()">+ Tab Baru</button>
+  <header>
+    <img src="1.png" alt="logo">
+    <button onclick="addFile()">+</button>
   </header>
 
-  <div id="tab-bar"></div>
+  <div id="file-list"></div>
 
-  <div id="editor-area" class="active" style="height: calc(100vh - 106px);"></div>
-
-  <div id="preview-area">
-    <button id="back-btn" onclick="backToEditor()">Kembali</button>
-    <iframe id="preview-frame" style="width:100%;height:100%;border:none;"></iframe>
+  <!-- Konfirmasi -->
+  <div id="confirm-popup">
+    <div id="confirm-box">
+      <p>Hapus file ini?</p>
+      <button id="confirm-yes">Ya</button>
+      <button id="confirm-no">Tidak</button>
+    </div>
   </div>
 
   <script>
-    let editors = [];
-    let activeTab = null;
-    let previewWindow = null;
-    let untitledCount = 1;
-    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-
-    const langMap = {
-      "html":"html","htm":"html","css":"css","js":"javascript","json":"json",
-      "c":"c","cpp":"cpp","py":"python","java":"java","php":"php","go":"go",
-      "ts":"typescript","xml":"xml","md":"markdown","yaml":"yaml","yml":"yaml","txt":"plaintext"
+    // config firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyA_92tUS5QoXAPsFqq6RKYSMUjpoLhrzZM",
+      authDomain: "coderunner-e31b1.firebaseapp.com",
+      projectId: "coderunner-e31b1",
+      databaseURL: "https://coderunner-e31b1-default-rtdb.firebaseio.com/",
+      storageBucket: "coderunner-e31b1.appspot.com",
+      messagingSenderId: "454753618705",
+      appId: "1:454753618705:web:3b0dfbaeb214cd54051ab0"
     };
-    function detectLang(name) {
-      const parts = name.split(".");
-      const ext = parts.length > 1 ? parts.pop().toLowerCase() : "txt";
-      return langMap[ext] || "plaintext";
-    }
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-    function createNameSpan(tabObj, tabEl) {
-      const span = document.createElement("span");
-      span.className = "name";
-      span.textContent = tabObj.name;
-      span.ondblclick = (e) => {
+    const fileListEl = document.getElementById("file-list");
+    const confirmPopup = document.getElementById("confirm-popup");
+    let fileToDelete = null;
+
+    function renderFile(id, data) {
+      const item = document.createElement("div");
+      item.className = "file-item";
+
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "file-name";
+      nameSpan.textContent = data.name;
+      nameSpan.onclick = () => {
+        // buka codingin.html dengan parameter file
+        window.location.href = `codingin.html?file=${encodeURIComponent(id)}`;
+      };
+
+      const actions = document.createElement("div");
+      actions.className = "actions";
+
+      const renameBtn = document.createElement("button");
+      renameBtn.className = "icon-btn";
+      renameBtn.innerHTML = "✏️";
+      renameBtn.onclick = (e) => {
         e.stopPropagation();
         const input = document.createElement("input");
         input.type = "text";
-        input.className = "tab-rename-input";
-        input.value = tabObj.name;
-        tabEl.replaceChild(input, span);
-        input.focus(); input.select();
-        const finish = () => finishRename(input, tabObj, tabEl);
-        const cancel = () => { tabEl.replaceChild(span, input); };
-        input.onblur = finish;
+        input.value = data.name;
+        input.className = "rename-input";
+        nameSpan.replaceWith(input);
+        input.focus();
+        input.onblur = () => finishRename(id, input, item);
         input.onkeydown = (ev) => {
-          if (ev.key === "Enter") finish();
-          else if (ev.key === "Escape") cancel();
+          if (ev.key === "Enter") finishRename(id, input, item);
+          else if (ev.key === "Escape") cancelRename(input, data.name, item);
         };
       };
-      return span;
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "icon-btn";
+      deleteBtn.innerHTML = "🗑️";
+      deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        fileToDelete = id;
+        confirmPopup.style.display = "flex";
+      };
+
+      actions.appendChild(renameBtn);
+      actions.appendChild(deleteBtn);
+
+      item.appendChild(nameSpan);
+      item.appendChild(actions);
+
+      fileListEl.appendChild(item);
     }
-    function finishRename(input, tabObj, tabEl) {
-      const newName = input.value.trim() || tabObj.name;
-      tabObj.name = newName;
-      const newLang = detectLang(newName);
-      if (newLang !== tabObj.lang) {
-        tabObj.lang = newLang;
-        monaco.editor.setModelLanguage(tabObj.model, newLang);
+
+    function finishRename(id, input, item) {
+      const newName = input.value.trim() || "untitled";
+      db.ref("files/" + id).update({ name: newName });
+    }
+    function cancelRename(input, oldName, item) {
+      const span = document.createElement("span");
+      span.className = "file-name";
+      span.textContent = oldName;
+      item.insertBefore(span, item.firstChild);
+      input.remove();
+    }
+
+    function addFile() {
+      const newId = "file-" + Date.now();
+      db.ref("files/" + newId).set({
+        name: "file baru",
+        content: ""
+      });
+    }
+
+    function deleteFile(id) {
+      db.ref("files/" + id).remove();
+    }
+
+    // konfirmasi popup
+    document.getElementById("confirm-yes").onclick = () => {
+      if (fileToDelete) {
+        deleteFile(fileToDelete);
+        fileToDelete = null;
       }
-      const newSpan = createNameSpan(tabObj, tabEl);
-      tabEl.replaceChild(newSpan, input);
-    }
+      confirmPopup.style.display = "none";
+    };
+    document.getElementById("confirm-no").onclick = () => {
+      confirmPopup.style.display = "none";
+      fileToDelete = null;
+    };
 
-    function addTab(name = null) {
-      if (!name) { name = `untitled-${untitledCount}.txt`; untitledCount++; }
-      const lang = detectLang(name);
-      const id = Date.now() + Math.floor(Math.random() * 1000);
-      const model = monaco.editor.createModel("", lang);
-      const tabObj = { id, name, lang, model };
-      editors.push(tabObj);
-
-      const tabEl = document.createElement("div");
-      tabEl.className = "tab";
-      const nameSpan = createNameSpan(tabObj, tabEl);
-      const closeSpan = document.createElement("span");
-      closeSpan.className = "close"; closeSpan.textContent = "×";
-      closeSpan.onclick = (ev) => closeTab(id, ev);
-      tabEl.appendChild(nameSpan); tabEl.appendChild(closeSpan);
-      tabEl.onclick = () => setActiveTab(id);
-      tabObj.el = tabEl;
-      document.getElementById("tab-bar").appendChild(tabEl);
-
-      if (!window.editor) {
-        window.editor = monaco.editor.create(document.getElementById("editor-area"), {
-          model:model, theme:"vs-dark", automaticLayout:true,
-          fontSize:14, minimap:{ enabled:false }
-        });
-      } else { window.editor.setModel(model); }
-      setActiveTab(id);
-      return tabObj;
-    }
-    function setActiveTab(id) {
-      activeTab = id;
-      editors.forEach(t => {
-        if (t.id === id) { window.editor.setModel(t.model); t.el.classList.add("active"); }
-        else t.el.classList.remove("active");
-      });
-    }
-    function closeTab(id, ev) {
-      ev.stopPropagation();
-      const idx = editors.findIndex(t => t.id === id);
-      if (idx > -1) {
-        editors[idx].model.dispose(); editors[idx].el.remove(); editors.splice(idx, 1);
-        if (editors.length === 0) { addTab(); }
-        else { const newIndex = Math.max(0, idx-1); setActiveTab(editors[newIndex].id); }
+    // realtime listener
+    db.ref("files").on("value", snapshot => {
+      fileListEl.innerHTML = "";
+      const files = snapshot.val();
+      for (let id in files) {
+        renderFile(id, files[id]);
       }
-    }
-
-    function generateCode() {
-      let html="",css="",js="",others="";
-      editors.forEach(t=>{
-        const val=t.model.getValue();
-        if(t.lang==="html") html+=val;
-        else if(t.lang==="css") css+=val;
-        else if(t.lang==="javascript") js+=val;
-        else others+=`<h3>${escapeHtml(t.name)}</h3><pre><code>${escapeHtml(val)}</code></pre>`;
-      });
-      return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${html}<script>${js}<\/script>${others}</body></html>`;
-    }
-    function escapeHtml(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
-
-    function showPreviewSameTab() {
-      const code = generateCode();
-      document.getElementById("editor-area").classList.remove("active");
-      document.getElementById("header").style.display = "none";
-      document.getElementById("tab-bar").style.display = "none";
-      document.getElementById("preview-area").classList.add("active");
-      const frameDoc = document.getElementById("preview-frame").contentWindow.document;
-      frameDoc.open(); frameDoc.write(code); frameDoc.close();
-      document.getElementById("back-btn").style.display = isMobile ? "block" : "none";
-    }
-    function showPreviewNewTab() {
-      const code = generateCode();
-      if (!previewWindow || previewWindow.closed) previewWindow = window.open();
-      previewWindow.document.open(); previewWindow.document.write(code); previewWindow.document.close();
-    }
-    function backToEditor() {
-      document.getElementById("preview-area").classList.remove("active");
-      document.getElementById("editor-area").classList.add("active");
-      document.getElementById("header").style.display = "flex";
-      document.getElementById("tab-bar").style.display = "flex";
-    }
-
-    if (!isMobile) {
-      document.addEventListener("keydown", function(e) {
-        if (e.ctrlKey && e.altKey) {
-          if (document.getElementById("editor-area").classList.contains("active")) showPreviewSameTab();
-          else backToEditor();
-        }
-      });
-    }
-
-    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' }});
-    require(["vs/editor/editor.main"], function () {
-      if (editors.length === 0) addTab("index.html");
     });
   </script>
 </body>
