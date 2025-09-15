@@ -1,237 +1,281 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <title>HTML Runner Pro</title>
+  <meta charset="UTF-8" />
+  <title>Codingin</title>
   <link rel="icon" type="image/png" href="1.png">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: "Segoe UI", sans-serif;
       background: #1e1e1e;
       color: #eee;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
     }
     header {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 10px;
-      background: #252526;
-      border-bottom: 1px solid #333;
+      gap: 6px;
+      padding: 8px;
+      background: #2c2c2c;
+      border-bottom: 1px solid #444;
+      flex-wrap: wrap;
     }
-    header select, header button {
+    header button {
       padding: 6px 12px;
-      border-radius: 4px;
       border: none;
+      border-radius: 4px;
+      cursor: pointer;
       font-size: 14px;
     }
-    select {
-      background: #2d2d30;
-      color: #eee;
+    header button:hover { opacity: 0.9; }
+    .btn-primary { background: dodgerblue; color: white; }
+    .btn-secondary { background: seagreen; color: white; }
+    .btn-danger { background: crimson; color: white; }
+
+    #tab-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      background: #222;
+      padding: 6px;
+      border-bottom: 1px solid #333;
+      min-height: 44px;
+      -webkit-overflow-scrolling: touch;
     }
-    button {
-      background: dodgerblue;
-      color: white;
+    .tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      background: #333;
+      color: #ccc;
+      border-radius: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+      height: 32px;
+      line-height: 1;
+      user-select: none;
+    }
+    .tab.active { background: dodgerblue; color: #fff; }
+    .tab .close {
+      font-weight: bold;
+      margin-left: 6px;
       cursor: pointer;
     }
-    button:hover { background: royalblue; }
-    #editors {
-      display: flex;
-      flex-direction: column;
-      height: calc(100vh - 50px);
-    }
-    .editor {
-      flex: 1;
-      border-top: 1px solid #333;
-    }
-    .hidden { display: none; }
-    .label {
-      background: #2d2d30;
-      color: #ccc;
-      padding: 4px 10px;
+    .tab input.tab-rename-input {
+      background: #555;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 2px 6px;
       font-size: 13px;
-      border-bottom: 1px solid #333;
+      height: 26px;
+      outline: none;
+      min-width: 80px;
+    }
+
+    #editor-area, #preview-area {
+      flex: 1;
+      display: none;
+      min-height: 0;
+    }
+    #editor-area.active, #preview-area.active { display: block; }
+    #preview-area {
+      background: #fff;
+      color: #000;
+      overflow: auto;
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+    #back-btn {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      padding: 6px 12px;
+      background: crimson;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    @media (max-width: 480px) {
+      #tab-bar { padding: 4px; min-height: 40px; }
+      .tab { padding: 5px 8px; height: 30px; font-size: 13px; }
+      header button { padding: 6px 8px; font-size: 13px; }
     }
   </style>
 
-  <!-- Monaco Editor -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
 </head>
 <body>
-  <header>
-    <label for="mode">Mode:</label>
-    <select id="mode">
-      <option value="combined">Gabungan</option>
-      <option value="separated">Terpisah</option>
-    </select>
-
-    <label for="theme">Tema:</label>
-    <select id="theme">
-      <option value="vs">Terang</option>
-      <option value="vs-dark" selected>Dark Mode</option>
-      <option value="modern-light">Modern Cerah</option>
-      <option value="modern-dark">Modern Gelap</option>
-      <option value="hacker">Hacker</option>
-    </select>
-
-    <button onclick="runCode()">Tampilkan</button>
+  <header id="header">
+    <button class="btn-primary" onclick="showPreviewSameTab()">Tampilkan</button>
+    <button class="btn-secondary" onclick="showPreviewNewTab()">Tampilkan di Tab Baru</button>
+    <button class="btn-danger" onclick="addTab()">+ Tab Baru</button>
   </header>
 
-  <div id="editors">
-    <!-- Gabungan -->
-    <div id="editor-combined" class="editor"></div>
+  <div id="tab-bar"></div>
 
-    <!-- Terpisah -->
-    <div class="label hidden" id="label-html">HTML</div>
-    <div id="editor-html" class="editor hidden"></div>
-    <div class="label hidden" id="label-css">CSS</div>
-    <div id="editor-css" class="editor hidden"></div>
-    <div class="label hidden" id="label-js">JS</div>
-    <div id="editor-js" class="editor hidden"></div>
+  <div id="editor-area" class="active" style="height: calc(100vh - 106px);"></div>
+
+  <div id="preview-area">
+    <button id="back-btn" onclick="backToEditor()">Kembali</button>
+    <iframe id="preview-frame" style="width:100%;height:100%;border:none;"></iframe>
   </div>
 
   <script>
-    let previewTab = null;
-    let editorCombined, editorHTML, editorCSS, editorJS;
+    let editors = [];
+    let activeTab = null;
+    let previewWindow = null;
+    let untitledCount = 1;
+    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+
+    const langMap = {
+      "html":"html","htm":"html","css":"css","js":"javascript","json":"json",
+      "c":"c","cpp":"cpp","py":"python","java":"java","php":"php","go":"go",
+      "ts":"typescript","xml":"xml","md":"markdown","yaml":"yaml","yml":"yaml","txt":"plaintext"
+    };
+    function detectLang(name) {
+      const parts = name.split(".");
+      const ext = parts.length > 1 ? parts.pop().toLowerCase() : "txt";
+      return langMap[ext] || "plaintext";
+    }
+
+    function createNameSpan(tabObj, tabEl) {
+      const span = document.createElement("span");
+      span.className = "name";
+      span.textContent = tabObj.name;
+      span.ondblclick = (e) => {
+        e.stopPropagation();
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "tab-rename-input";
+        input.value = tabObj.name;
+        tabEl.replaceChild(input, span);
+        input.focus(); input.select();
+        const finish = () => finishRename(input, tabObj, tabEl);
+        const cancel = () => { tabEl.replaceChild(span, input); };
+        input.onblur = finish;
+        input.onkeydown = (ev) => {
+          if (ev.key === "Enter") finish();
+          else if (ev.key === "Escape") cancel();
+        };
+      };
+      return span;
+    }
+    function finishRename(input, tabObj, tabEl) {
+      const newName = input.value.trim() || tabObj.name;
+      tabObj.name = newName;
+      const newLang = detectLang(newName);
+      if (newLang !== tabObj.lang) {
+        tabObj.lang = newLang;
+        monaco.editor.setModelLanguage(tabObj.model, newLang);
+      }
+      const newSpan = createNameSpan(tabObj, tabEl);
+      tabEl.replaceChild(newSpan, input);
+    }
+
+    function addTab(name = null) {
+      if (!name) { name = `untitled-${untitledCount}.txt`; untitledCount++; }
+      const lang = detectLang(name);
+      const id = Date.now() + Math.floor(Math.random() * 1000);
+      const model = monaco.editor.createModel("", lang);
+      const tabObj = { id, name, lang, model };
+      editors.push(tabObj);
+
+      const tabEl = document.createElement("div");
+      tabEl.className = "tab";
+      const nameSpan = createNameSpan(tabObj, tabEl);
+      const closeSpan = document.createElement("span");
+      closeSpan.className = "close"; closeSpan.textContent = "×";
+      closeSpan.onclick = (ev) => closeTab(id, ev);
+      tabEl.appendChild(nameSpan); tabEl.appendChild(closeSpan);
+      tabEl.onclick = () => setActiveTab(id);
+      tabObj.el = tabEl;
+      document.getElementById("tab-bar").appendChild(tabEl);
+
+      if (!window.editor) {
+        window.editor = monaco.editor.create(document.getElementById("editor-area"), {
+          model:model, theme:"vs-dark", automaticLayout:true,
+          fontSize:14, minimap:{ enabled:false }
+        });
+      } else { window.editor.setModel(model); }
+      setActiveTab(id);
+      return tabObj;
+    }
+    function setActiveTab(id) {
+      activeTab = id;
+      editors.forEach(t => {
+        if (t.id === id) { window.editor.setModel(t.model); t.el.classList.add("active"); }
+        else t.el.classList.remove("active");
+      });
+    }
+    function closeTab(id, ev) {
+      ev.stopPropagation();
+      const idx = editors.findIndex(t => t.id === id);
+      if (idx > -1) {
+        editors[idx].model.dispose(); editors[idx].el.remove(); editors.splice(idx, 1);
+        if (editors.length === 0) { addTab(); }
+        else { const newIndex = Math.max(0, idx-1); setActiveTab(editors[newIndex].id); }
+      }
+    }
+
+    function generateCode() {
+      let html="",css="",js="",others="";
+      editors.forEach(t=>{
+        const val=t.model.getValue();
+        if(t.lang==="html") html+=val;
+        else if(t.lang==="css") css+=val;
+        else if(t.lang==="javascript") js+=val;
+        else others+=`<h3>${escapeHtml(t.name)}</h3><pre><code>${escapeHtml(val)}</code></pre>`;
+      });
+      return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${html}<script>${js}<\/script>${others}</body></html>`;
+    }
+    function escapeHtml(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+
+    function showPreviewSameTab() {
+      const code = generateCode();
+      document.getElementById("editor-area").classList.remove("active");
+      document.getElementById("header").style.display = "none";
+      document.getElementById("tab-bar").style.display = "none";
+      document.getElementById("preview-area").classList.add("active");
+      const frameDoc = document.getElementById("preview-frame").contentWindow.document;
+      frameDoc.open(); frameDoc.write(code); frameDoc.close();
+      document.getElementById("back-btn").style.display = isMobile ? "block" : "none";
+    }
+    function showPreviewNewTab() {
+      const code = generateCode();
+      if (!previewWindow || previewWindow.closed) previewWindow = window.open();
+      previewWindow.document.open(); previewWindow.document.write(code); previewWindow.document.close();
+    }
+    function backToEditor() {
+      document.getElementById("preview-area").classList.remove("active");
+      document.getElementById("editor-area").classList.add("active");
+      document.getElementById("header").style.display = "flex";
+      document.getElementById("tab-bar").style.display = "flex";
+    }
+
+    if (!isMobile) {
+      document.addEventListener("keydown", function(e) {
+        if (e.ctrlKey && e.altKey) {
+          if (document.getElementById("editor-area").classList.contains("active")) showPreviewSameTab();
+          else backToEditor();
+        }
+      });
+    }
 
     require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' }});
     require(["vs/editor/editor.main"], function () {
-      // custom themes
-      monaco.editor.defineTheme("modern-light", {
-        base: "vs",
-        inherit: true,
-        rules: [
-          { token: "", foreground: "2c3e50", background: "ecf0f1" },
-          { token: "keyword", foreground: "2980b9", fontStyle: "bold" },
-          { token: "string", foreground: "27ae60" },
-          { token: "number", foreground: "8e44ad" }
-        ],
-        colors: {
-          "editor.background": "#ecf0f1",
-          "editor.lineHighlightBackground": "#dfe6e9",
-          "editorCursor.foreground": "#e74c3c"
-        }
-      });
-
-      monaco.editor.defineTheme("modern-dark", {
-        base: "vs-dark",
-        inherit: true,
-        rules: [
-          { token: "", foreground: "ecf0f1", background: "2c3e50" },
-          { token: "keyword", foreground: "e67e22", fontStyle: "bold" },
-          { token: "string", foreground: "2ecc71" },
-          { token: "number", foreground: "9b59b6" }
-        ],
-        colors: {
-          "editor.background": "#2c3e50",
-          "editorCursor.foreground": "#f1c40f"
-        }
-      });
-
-      monaco.editor.defineTheme("hacker", {
-        base: "vs-dark",
-        inherit: true,
-        rules: [
-          { token: "", foreground: "00ff00", background: "000000" },
-          { token: "keyword", foreground: "00ff00", fontStyle: "bold" },
-          { token: "string", foreground: "33ff33" },
-          { token: "number", foreground: "55ff55" }
-        ],
-        colors: {
-          "editor.background": "#000000",
-          "editorCursor.foreground": "#00ff00"
-        }
-      });
-
-      // Editor gabungan
-      editorCombined = monaco.editor.create(document.getElementById("editor-combined"), {
-        value: "",
-        language: "html",
-        theme: "vs-dark",
-        automaticLayout: true,
-        fontSize: 14,
-        minimap: { enabled: false }
-      });
-
-      // Editor terpisah
-      editorHTML = monaco.editor.create(document.getElementById("editor-html"), {
-        value: "",
-        language: "html",
-        theme: "vs-dark",
-        automaticLayout: true,
-        fontSize: 14,
-        minimap: { enabled: false }
-      });
-      editorCSS = monaco.editor.create(document.getElementById("editor-css"), {
-        value: "",
-        language: "css",
-        theme: "vs-dark",
-        automaticLayout: true,
-        fontSize: 14,
-        minimap: { enabled: false }
-      });
-      editorJS = monaco.editor.create(document.getElementById("editor-js"), {
-        value: "",
-        language: "javascript",
-        theme: "vs-dark",
-        automaticLayout: true,
-        fontSize: 14,
-        minimap: { enabled: false }
-      });
-
-      // auto-run semua editor
-      [editorCombined, editorHTML, editorCSS, editorJS].forEach(ed => {
-        ed.onDidChangeModelContent(() => {
-          if (previewTab && !previewTab.closed) runCode();
-        });
-      });
-    });
-
-    function runCode() {
-      const mode = document.getElementById("mode").value;
-      let code = "";
-
-      if (mode === "combined") {
-        code = editorCombined.getValue();
-      } else {
-        const html = editorHTML.getValue();
-        const css = `<style>${editorCSS.getValue()}</style>`;
-        const js = `<script>${editorJS.getValue()}<\/script>`;
-        code = `<!DOCTYPE html><html><head>${css}</head><body>${html}${js}</body></html>`;
-      }
-
-      if (!previewTab || previewTab.closed) {
-        previewTab = window.open();
-      }
-      previewTab.document.open();
-      previewTab.document.write(code);
-      previewTab.document.close();
-    }
-
-    // Ganti mode editor
-    document.getElementById("mode").addEventListener("change", function() {
-      const mode = this.value;
-      if (mode === "combined") {
-        document.getElementById("editor-combined").classList.remove("hidden");
-        ["html","css","js"].forEach(id=>{
-          document.getElementById("editor-"+id).classList.add("hidden");
-          document.getElementById("label-"+id).classList.add("hidden");
-        });
-      } else {
-        document.getElementById("editor-combined").classList.add("hidden");
-        ["html","css","js"].forEach(id=>{
-          document.getElementById("editor-"+id).classList.remove("hidden");
-          document.getElementById("label-"+id).classList.remove("hidden");
-        });
-      }
-    });
-
-    // Ganti tema editor
-    document.getElementById("theme").addEventListener("change", function() {
-      const theme = this.value;
-      monaco.editor.setTheme(theme);
+      if (editors.length === 0) addTab("index.html");
     });
   </script>
 </body>
 </html>
-
