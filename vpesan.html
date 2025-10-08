@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Virgo Chat (Dark Mode)</title>
+    <link rel="icon" type="image/png" href="1.png">
+    <meta name="theme-color" content="#202c33" />
+    <style>
+        /* Skema Warna Dark Mode */
+        :root {
+            --bg-primary: #121212;
+            --bg-secondary: #0b141a; /* Latar Belakang Chat */
+            --bg-header-input: #202c33;
+            --text-light: #ffffff;
+            --text-dark: #e0e0e0;
+            --text-subtle: #aab8c2;
+            --bubble-self: #005c4b; /* Pesan Saya (Hijau gelap) */
+            --bubble-other: #202c33; /* Pesan Lawan (Abu-abu gelap) */
+            --input-field: #2a3942;
+            --border-color: #3a4652;
+            --accent-blue: #34b7f1;
+            --action-clear: #d9534f;
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            background: var(--bg-primary);
+            color: var(--text-dark);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            background: var(--bg-header-input);
+            color: var(--text-light);
+            padding: 0.8rem 1rem;
+            font-weight: bold;
+            font-size: 1.1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+        }
+
+        #clear-all {
+            background: var(--action-clear);
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+        #clear-all:hover { background: #c9302c; }
+
+        #chat-box {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            scroll-behavior: smooth;
+            /* Latar belakang polos dark mode (gambar URL dihapus) */
+            background: var(--bg-secondary);
+        }
+
+        #chat-box::-webkit-scrollbar {
+            display: none;
+        }
+
+        .pesan-ku,
+        .pesan-lawan {
+            max-width: 70%;
+            padding: 0.6rem 0.9rem;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            line-height: 1.3;
+            position: relative;
+            transition: transform 0.2s ease, box-shadow 0.2s;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.2);
+        }
+
+        .pesan-ku {
+            align-self: flex-end;
+            background: var(--bubble-self);
+            color: var(--text-light);
+            border-top-right-radius: 4px;
+        }
+
+        .pesan-lawan {
+            align-self: flex-start;
+            background: var(--bubble-other);
+            color: var(--text-light);
+            border-top-left-radius: 4px;
+        }
+        
+        /* Gaya saat tools (hapus/balas) ditampilkan */
+        .pesan-ku:hover, .pesan-lawan:hover,
+        .pesan-ku.pesan-show-tools, .pesan-lawan.pesan-show-tools {
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+        }
+
+        .hapus-btn,
+        .reply-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            border: none;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            font-size: 14px;
+            display: none;
+            cursor: pointer;
+            background: var(--accent-blue);
+            color: white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+            transition: opacity 0.2s;
+        }
+        .hapus-btn:hover, .reply-btn:hover { opacity: 0.8; }
+
+
+        .hapus-btn { right: -65px; }
+        .reply-btn { right: -35px; }
+        .pesan-lawan .reply-btn { left: -35px; right: auto; }
+
+        .pesan-ku.pesan-show-tools { transform: translateX(-70px); }
+        .pesan-lawan.pesan-show-tools { transform: translateX(40px); }
+
+        .pesan-ku.pesan-show-tools .hapus-btn,
+        .pesan-ku.pesan-show-tools .reply-btn,
+        .pesan-lawan.pesan-show-tools .reply-btn {
+            display: block;
+        }
+
+        .reply-bubble {
+            font-size: 0.8rem;
+            color: var(--text-subtle);
+            border-left: 3px solid var(--accent-blue);
+            padding-left: 6px;
+            margin-bottom: 4px;
+        }
+
+        #reply-preview {
+            display: none;
+            background: var(--input-field);
+            border-left: 4px solid var(--accent-blue);
+            padding: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--text-dark);
+            margin: 0 0.5rem;
+            border-radius: 8px;
+            width: calc(100% - 1rem);
+        }
+
+        #reply-preview span {
+            font-weight: bold;
+            color: var(--accent-blue);
+        }
+
+        #reply-preview button {
+            float: right;
+            background: none;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            color: var(--text-subtle);
+        }
+
+        form {
+            display: flex;
+            align-items: flex-end;
+            padding: 0.5rem;
+            background: var(--bg-header-input);
+            border-top: 1px solid var(--border-color);
+            flex-direction: column;
+            gap: 0.3rem;
+            box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.4);
+        }
+
+        .input-row {
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+
+        /* Input Teks: Memenuhi seluruh lebar karena tombol kirim dihapus */
+        textarea {
+            flex: 1;
+            padding: 0.6rem 1rem;
+            border: none;
+            border-radius: 25px;
+            background: var(--input-field);
+            color: var(--text-light);
+            font-size: 1rem;
+            outline: none;
+            resize: none;
+            max-height: 120px;
+            line-height: 1.4;
+            overflow-y: auto;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+            /* Pastikan textarea memenuhi lebar penuh */
+            width: 100%; 
+        }
+        textarea::placeholder {
+            color: var(--text-subtle);
+        }
+
+        /* Tombol Kirim Dihapus, CSS ini tidak digunakan lagi */
+        button[type="submit"] {
+            display: none;
+        }
+
+        /* Popup konfirmasi */
+        #confirm-popup {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        #confirm-popup div {
+            background: var(--input-field);
+            color: var(--text-light);
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 300px;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        #confirm-popup button {
+            margin: 5px;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            color: white;
+            font-weight: bold;
+            transition: opacity 0.2s;
+        }
+        #confirm-popup button:hover { opacity: 0.8; }
+
+        #confirm-yes { background: var(--action-clear); }
+        #confirm-no { background: #6c757d; }
+
+        /* Toast */
+        #toast {
+            visibility: hidden;
+            min-width: 200px;
+            margin-left: -100px;
+            background: var(--input-field);
+            color: var(--text-light);
+            text-align: center;
+            border-radius: 4px;
+            padding: 10px;
+            position: fixed;
+            left: 50%;
+            bottom: 30px;
+            z-index: 10000;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.5s, bottom 0.5s;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        Virgo Chat
+        <button id="clear-all">Hapus Semua</button>
+    </header>
+
+    <main id="chat-box"></main>
+
+    <form id="chat-form" autocomplete="off">
+        <div id="reply-preview"></div>
+        <div class="input-row">
+            <textarea id="message-input" placeholder="Ketik pesan..." rows="1" required autofocus></textarea>
+            </div>
+    </form>
+
+    <div id="confirm-popup">
+        <div>
+            <p>Yakin mau hapus semua pesan?</p>
+            <button id="confirm-yes">Ya</button>
+            <button id="confirm-no">Batal</button>
+        </div>
+    </div>
+
+    <div id="toast">Semua pesan berhasil dihapus</div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDXt7Jh0W-d5blhNoi3ocRdw4OyAY7fd3c",
+            authDomain: "pesan-30bab.firebaseapp.com",
+            databaseURL: "https://pesan-30bab-default-rtdb.firebaseio.com",
+            projectId: "pesan-30bab",
+            storageBucket: "pesan-30bab.appspot.com",
+            messagingSenderId: "973488115942",
+            appId: "1:973488115942:web:0a8383a7a7b03aa9ba6b27"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        const username = "Virgo";
+        const chatBox = document.getElementById("chat-box");
+        const form = document.getElementById("chat-form");
+        const input = document.getElementById("message-input");
+        const replyPreview = document.getElementById("reply-preview");
+
+        let replyTo = null;
+
+        // Auto resize textarea
+        input.addEventListener("input", () => {
+            input.style.height = "auto";
+            input.style.height = (input.scrollHeight) + "px";
+        });
+        
+        // KIRIM PESAN DENGAN TOMBOL ENTER
+        input.addEventListener("keydown", (e) => {
+            // Cek jika tombol yang ditekan adalah Enter dan TIDAK bersamaan dengan Shift (untuk baris baru)
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault(); // Mencegah Enter membuat baris baru
+                submitMessage();
+            }
+        });
+
+        // Hapus event listener submit form karena kita hanya menggunakan keydown Enter
+        // form.addEventListener("submit", (e) => { e.preventDefault(); submitMessage(); });
+
+        function submitMessage() {
+            const message = input.value.trim();
+            if (message.length > 0 && message.length <= 500) {
+                db.ref("pesan").push({
+                    nama: username,
+                    teks: message,
+                    replyTo: replyTo,
+                    waktu: Date.now()
+                });
+                
+                // Reset input dan fokus kembali
+                input.value = "";
+                input.style.height = "auto";
+                replyTo = null;
+                replyPreview.style.display = "none";
+                chatBox.scrollTop = chatBox.scrollHeight;
+                input.focus(); // Fokus otomatis setelah kirim
+            }
+        }
+
+
+        function createMessageElement(data, key) {
+            const el = document.createElement("div");
+            el.className = data.nama === username ? "pesan-ku" : "pesan-lawan";
+            el.dataset.key = key;
+
+            if (data.replyTo) {
+                const replyEl = document.createElement("div");
+                replyEl.className = "reply-bubble";
+                const replyerName = data.replyTo.nama === username ? "Saya" : data.replyTo.nama;
+                replyEl.textContent = replyerName + ": " + data.replyTo.teks.substring(0, 30) + (data.replyTo.teks.length > 30 ? "..." : "");
+                el.appendChild(replyEl);
+            }
+
+            const teksEl = document.createElement("div");
+            teksEl.textContent = data.teks;
+            el.appendChild(teksEl);
+
+            // Tombol Hapus (hanya untuk pesan saya)
+            if (data.nama === username) {
+                const delBtn = document.createElement("button");
+                delBtn.innerHTML = "&#x2716;"; // '✖'
+                delBtn.className = "hapus-btn";
+                delBtn.addEventListener("click", (event) => {
+                    event.stopPropagation();
+                    db.ref("pesan").child(key).remove();
+                });
+                el.appendChild(delBtn);
+            }
+
+            // Tombol Balas
+            const replyBtn = document.createElement("button");
+            replyBtn.innerHTML = "&#x21a9;"; // '↩'
+            replyBtn.className = "reply-btn";
+            replyBtn.addEventListener("click", (event) => {
+                event.stopPropagation();
+                replyTo = {
+                    nama: data.nama,
+                    teks: data.teks
+                };
+                replyPreview.innerHTML = "";
+                
+                const replyerName = data.nama === username ? "Saya" : data.nama;
+
+                const span = document.createElement("span");
+                span.textContent = "Balas ke " + replyerName;
+                replyPreview.appendChild(span);
+                replyPreview.appendChild(document.createTextNode(": " + data.teks.substring(0, 50) + (data.teks.length > 50 ? "..." : "")));
+                
+                const cancelBtn = document.createElement("button");
+                cancelBtn.innerHTML = "&#x2716;";
+                cancelBtn.onclick = cancelReply;
+                replyPreview.appendChild(cancelBtn);
+                replyPreview.style.display = "block";
+                input.focus();
+                
+                document.querySelectorAll('.pesan-show-tools').forEach(p => p.classList.remove('pesan-show-tools'));
+            });
+            el.appendChild(replyBtn);
+
+            // Toggle show tools on click
+            el.addEventListener("click", () => {
+                document.querySelectorAll('.pesan-show-tools').forEach(p => {
+                    if (p !== el) {
+                        p.classList.remove('pesan-show-tools');
+                    }
+                });
+                el.classList.toggle("pesan-show-tools");
+            });
+
+            return el;
+        }
+
+        function cancelReply() {
+            replyTo = null;
+            replyPreview.style.display = "none";
+            input.focus(); // Fokus kembali setelah batal balas
+        }
+
+        // Logika Firebase
+        let firstLoad = true;
+        const pesanRef = db.ref("pesan").limitToLast(50);
+
+        pesanRef.on("child_added", (snap) => {
+            const data = snap.val();
+            const key = snap.key;
+            const el = createMessageElement(data, key);
+
+            if (!chatBox.querySelector(`[data-key="${key}"]`)) {
+                chatBox.appendChild(el);
+            }
+
+            if (!firstLoad) {
+                const isUserAtBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 100;
+                if (isUserAtBottom || data.nama === username) {
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                }
+            }
+
+            // Batasi 50 pesan.
+            while (chatBox.children.length > 50) {
+                const first = chatBox.firstChild;
+                if (first && first.dataset.key) {
+                    first.remove();
+                }
+            }
+        });
+
+        // Scroll ke bawah saat pertama kali memuat dan fokuskan input
+        pesanRef.once("value", () => {
+            chatBox.scrollTop = chatBox.scrollHeight;
+            firstLoad = false;
+            input.focus(); // Fokuskan setelah load
+        });
+
+        db.ref("pesan").on("child_removed", (snap) => {
+            const key = snap.key;
+            const el = chatBox.querySelector(`[data-key="${key}"]`);
+            if (el) el.remove();
+        });
+
+        // Toast & Popup
+        function showToast(msg) {
+            const toast = document.getElementById("toast");
+            toast.textContent = msg;
+            toast.style.visibility = "visible";
+            toast.style.opacity = "1";
+            toast.style.bottom = "50px";
+
+            setTimeout(() => {
+                toast.style.opacity = "0";
+                toast.style.bottom = "30px";
+                setTimeout(() => {
+                    toast.style.visibility = "hidden";
+                }, 500);
+            }, 3000);
+        }
+
+        const popup = document.getElementById("confirm-popup");
+        const yesBtn = document.getElementById("confirm-yes");
+        const noBtn = document.getElementById("confirm-no");
+
+        document.getElementById("clear-all").addEventListener("click", () => {
+            popup.style.display = "flex";
+            yesBtn.focus();
+        });
+
+        yesBtn.addEventListener("click", () => {
+            db.ref("pesan").remove()
+                .then(() => {
+                    chatBox.innerHTML = "";
+                    popup.style.display = "none";
+                    showToast("✅ Semua pesan berhasil dihapus");
+                });
+        });
+
+        noBtn.addEventListener("click", () => {
+            popup.style.display = "none";
+            input.focus(); // Fokus kembali ke input setelah batal
+        });
+
+        document.addEventListener("keydown", (e) => {
+            if (popup.style.display === "flex") {
+                if (e.key === "Enter") yesBtn.click();
+                if (e.key === "Escape") noBtn.click();
+            }
+        });
+    </script>
+</body>
+
+</html>
