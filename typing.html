@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tes Mengetik & Manajemen Teks</title>
+    <!-- Tailwind CSS CDN untuk styling modern dan responsif -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome untuk ikon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Gaya dasar dan font */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1f2937; /* abu-abu gelap */
+            color: #f3f4f6;
+            min-height: 100vh;
+        }
+        /* Styling tambahan untuk area mengetik */
+        #quote-display {
+            background-color: #f9fafb;
+            color: #1f2937;
+            padding: 1.25rem;
+            border-radius: 0.5rem;
+            font-size: 1.1rem;
+            line-height: 1.75;
+            text-align: justify;
+            min-height: 8rem;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+            /* Memungkinkan pemotongan baris standar, tetapi akan diatasi oleh .word */
+            word-break: normal;
+            /* Pastikan tidak ada spasi yang diabaikan */
+            white-space: normal;
+            /* FIX: Memastikan kata yang sangat panjang tidak menerobos/overflow */
+            overflow-wrap: break-word; 
+            word-wrap: break-word; 
+        }
+        /* BARU: Memastikan seluruh kata (yang terdiri dari banyak span.char) tidak terpotong di tengah */
+        .word {
+            white-space: nowrap; /* Mencegah pemotongan baris di dalam elemen ini */
+            display: inline; /* Memastikan aliran teks tetap inline */
+        }
+        /* Efek visual untuk mengetik */
+        .char {
+            transition: background-color 0.1s;
+        }
+        .correct { 
+            color: #10b981; /* hijau */
+        }
+        .incorrect { 
+            background-color: #ef4444; /* merah */
+            color: white; 
+            border-radius: 2px; 
+            box-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
+        }
+        /* Penanda posisi kursor */
+        .current { 
+            border-bottom: 3px solid #3b82f6; /* biru */
+            padding-bottom: 2px;
+        }
+        /* TextArea */
+        #quote-input {
+            font-family: monospace;
+            font-size: 1.1rem;
+            outline: none;
+            box-sizing: border-box;
+            resize: none;
+        }
+        /* Gaya overlay manajemen untuk mobile/tablet agar menutupi penuh (tetap dipertahankan untuk styling) */
+        .management-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 40;
+            overflow-y: auto; 
+            background-color: #1f2937; /* Menggunakan warna body untuk latar belakang */
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+<div id="alertContainer" class="fixed top-4 right-4 z-50">
+    <!-- Pesan peringatan akan muncul di sini -->
+</div>
+
+<!-- Menghapus class 'container-grid' dari mainContainer karena kita tidak menggunakan grid dua kolom lagi -->
+<div id="mainContainer" class="max-w-7xl mx-auto">
+    
+    <!-- Panel 1: Tes Kecepatan Mengetik -->
+    <!-- Sekarang panel ini akan selalu terlihat saat panel manajemen disembunyikan. -->
+    <div id="typing-panel-content" class="bg-gray-800 p-6 rounded-xl shadow-2xl relative">
+        <div class="flex justify-between items-start mb-6">
+            <h1 class="text-3xl font-bold text-yellow-400">Tes Kecepatan Mengetik</h1>
+            <!-- Tombol Gerigi untuk menampilkan/menyembunyikan manajemen -->
+            <button id="toggleManagementBtn" onclick="toggleManagementPanel()" 
+                    class="p-3 bg-gray-700 hover:bg-gray-600 rounded-full text-gray-300 transition duration-200 shadow-md transform hover:rotate-12">
+                <i class="fas fa-cog fa-lg"></i>
+            </button>
+        </div>
+
+        <!-- BARIS INI TELAH DIHAPUS: <p class="text-gray-300 mb-4">Ketik teks di bawah secepat dan seakurat mungkin. Teks dimuat dari database secara acak.</p> -->
+        
+        <div id="quote-display" class="mb-6 shadow-md">
+            Memuat teks dari database...
+        </div>
+        
+        <textarea id="quote-input" 
+                  placeholder="Ketik di sini untuk memulai..." 
+                  oninput="processInput()" 
+                  class="w-full h-24 p-3 text-gray-800 border-2 border-gray-600 rounded-lg focus:border-blue-500 transition duration-200" 
+                  disabled></textarea>
+
+        <div class="flex justify-between items-center bg-gray-700 p-4 rounded-lg mt-4 shadow-inner">
+            <div class="text-center">WPM: <span id="wpm" class="text-yellow-400 font-extrabold text-xl">0</span></div>
+            <div class="text-center">Akurasi: <span id="accuracy" class="text-yellow-400 font-extrabold text-xl">0%</span></div>
+            <div class="text-center">Waktu: <span id="time" class="text-yellow-400 font-extrabold text-xl">0s</span></div>
+        </div>
+        
+        <button id="startButton" onclick="startGame()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg mt-6 transition duration-200 shadow-lg" disabled>
+            Mulai
+        </button>
+    </div>
+
+    <!-- Panel 2: Manajemen Teks (Realtime Database) -->
+    <!-- Menghapus class 'lg:block' agar panel ini disembunyikan total saat dimuat. -->
+    <div id="management-panel" class="bg-gray-800 p-6 rounded-xl shadow-2xl hidden">
+        <h2 class="text-2xl font-bold text-green-400 mb-6 flex justify-between items-center">
+            Manajemen Teks
+            <!-- Ikon penutup untuk kembali ke panel mengetik -->
+            <button onclick="toggleManagementPanel()" class="p-2 text-gray-300 hover:text-white rounded-full hover:bg-gray-700">
+                <i class="fas fa-times fa-lg"></i>
+            </button>
+        </h2>
+        
+        <!-- Tambah Teks Baru -->
+        <div class="mb-8 p-4 bg-gray-700 rounded-lg shadow-md">
+            <h3 class="text-xl font-semibold mb-3">Tambah Teks Baru</h3>
+            <textarea id="newText" 
+                      placeholder="Masukkan teks baru untuk latihan mengetik (min. 10 karakter)..." 
+                      class="w-full h-20 p-3 text-gray-800 border-2 border-gray-600 rounded-lg focus:border-green-500 transition duration-200 resize-none"></textarea>
+            <button onclick="addText()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg mt-3 transition duration-200">
+                <i class="fas fa-plus mr-2"></i> Simpan Teks ke Database
+            </button>
+        </div>
+
+        <!-- Daftar Teks Tersimpan -->
+        <div>
+            <h3 class="text-xl font-semibold mb-3">Daftar Teks Tersimpan (<span id="textCount">0</span>)</h3>
+            <p class="text-sm text-gray-400 mb-3">Klik tombol 'Hapus' untuk menghapus teks dari database.</p>
+            <ul id="quotesList" class="max-h-96 overflow-y-auto pr-2">
+                <!-- Teks akan dimuat di sini dari Firebase -->
+            </ul>
+        </div>
+    </div>
+
+</div>
+
+<script type="module">
+    // Import modul Firebase
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, push, remove, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    // --- 1. Konfigurasi dan Inisialisasi Firebase ---
+
+    // Mengambil konfigurasi dari variabel global
+    const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : JSON.stringify({
+      // Konfigurasi fallback jika tidak ada
+      apiKey: "AIzaSyBHpRt8cs00RI3rRcELKhkYRID5svpSZoY",
+      authDomain: "myyg4m5.firebaseapp.com",
+      databaseURL: "https://myyg4m5-default-rtdb.firebaseio.com",
+      projectId: "myyg4m5",
+      storageBucket: "myyg4m5.firebasestorage.app",
+      messagingSenderId: "204097552587",
+      appId: "1:204097552587:web:bd2dbb5d2c02c342fc5b4e"
+    }));
+
+    // Inisialisasi Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    // Jalur database: Menghubungkan ke node 'user_texts'
+    const textsRef = ref(db, 'user_texts'); 
+    
+    // Variabel global untuk menampung teks dari database
+    let allQuotes = []; 
+    let timer;
+    let startTime;
+    let quoteToType;
+    let totalWords = 0;
+    
+    const quoteDisplay = document.getElementById('quote-display');
+    const quoteInput = document.getElementById('quote-input');
+    const wpmDisplay = document.getElementById('wpm');
+    const accuracyDisplay = document.getElementById('accuracy');
+    const timeDisplay = document.getElementById('time');
+    const startButton = document.getElementById('startButton');
+    const typingPanelContent = document.getElementById('typing-panel-content');
+    const managementPanel = document.getElementById('management-panel'); // Referensi panel manajemen
+
+    // --- 2. Fungsi Utilitas UI ---
+
+    // Fungsi untuk menampilkan pesan pop-up (mengganti alert())
+    const alertMessage = (message, type = 'info') => {
+        const alertContainer = document.getElementById('alertContainer');
+        const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+        const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-times-circle' : 'fa-info-circle';
+
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `flex items-center ${bgColor} text-white text-sm font-bold px-4 py-3 rounded-lg shadow-lg mb-2`;
+        alertDiv.innerHTML = `<i class="fas ${icon} mr-3"></i> ${message}`;
+        
+        alertContainer.appendChild(alertDiv);
+        
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 5000);
+    };
+    
+    // Fungsi untuk menampilkan/menyembunyikan panel secara bergantian (Perbaikan untuk semua ukuran layar)
+    window.toggleManagementPanel = () => {
+        
+        // Cek apakah panel manajemen sedang disembunyikan (artinya kita akan menampilkannya)
+        const isManagementHidden = managementPanel.classList.contains('hidden');
+
+        if (isManagementHidden) {
+            // Tampilkan Panel Manajemen
+            managementPanel.classList.remove('hidden');
+            typingPanelContent.classList.add('hidden');
+            // Tambahkan class overlay agar terlihat penuh di semua layar
+            managementPanel.classList.add('management-overlay'); 
+        } else {
+            // Tampilkan Panel Mengetik
+            managementPanel.classList.add('hidden');
+            typingPanelContent.classList.remove('hidden');
+            // Hapus class overlay
+            managementPanel.classList.remove('management-overlay'); 
+        }
+    };
+
+
+    // --- 3. Fungsi Manajemen Teks Firebase (CRUD) ---
+
+    // Tambah Teks
+    window.addText = async () => {
+        const newTextarea = document.getElementById('newText');
+        const newText = newTextarea.value.trim();
+        
+        if (newText.length > 10) { 
+            try {
+                // Gunakan push() untuk menambahkan data unik baru
+                await push(textsRef, { text: newText, created: Date.now() });
+                newTextarea.value = '';
+                alertMessage('Teks berhasil ditambahkan!', 'success');
+            } catch (error) {
+                console.error("Gagal menambahkan teks:", error);
+                alertMessage('Gagal menambahkan teks. Pastikan database URL dan aturan keamanan benar.', 'error');
+            }
+        } else {
+            alertMessage('Teks harus memiliki minimal 10 karakter.', 'info');
+        }
+    };
+
+    // Hapus Teks
+    window.deleteText = async (id) => {
+        // Mengganti confirm() dengan alertMessage sebagai praktik terbaik
+        alertMessage('Menghapus teks...', 'info'); 
+        
+        try {
+            // Referensi ke item spesifik di database
+            const itemRef = ref(db, `user_texts/${id}`); 
+            await remove(itemRef);
+            alertMessage('Teks berhasil dihapus!', 'success');
+        } catch (error) {
+            console.error("Gagal menghapus teks:", error);
+            alertMessage('Gagal menghapus teks. Lihat konsol untuk detail.', 'error');
+        }
+    };
+
+    // Memuat Teks (Real-time Listener)
+    const loadTexts = () => {
+        const quotesList = document.getElementById('quotesList');
+        const textCountDisplay = document.getElementById('textCount');
+
+        // onValue mendengarkan perubahan data secara real-time
+        onValue(textsRef, (snapshot) => {
+            allQuotes = []; // Reset array quotes
+            const data = snapshot.val();
+            quotesList.innerHTML = ''; // Kosongkan daftar UI
+
+            if (data) {
+                Object.keys(data).forEach(key => {
+                    const quoteText = data[key].text;
+                    // Simpan objek {id, text} ke array global
+                    allQuotes.push({ id: key, text: quoteText }); 
+
+                    // Update UI Manajemen Teks
+                    const li = document.createElement('li');
+                    li.className = 'flex justify-between items-center p-3 bg-gray-700 hover:bg-gray-600 transition duration-150 rounded-lg mb-2 border border-gray-600';
+                    li.innerHTML = `
+                        <span class="text-sm text-gray-200 flex-1 mr-4 overflow-hidden truncate">${quoteText}</span>
+                        <button onclick="deleteText('${key}')" class="text-red-400 hover:text-red-300 transition duration-150 p-2 rounded-full hover:bg-gray-800">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    `;
+                    quotesList.appendChild(li);
+                });
+            } else {
+                 quotesList.innerHTML = '<li class="text-gray-400 p-3 text-center">Tidak ada teks tersimpan. Silakan tambah teks baru!</li>';
+            }
+            
+            // Perbarui jumlah teks
+            textCountDisplay.textContent = allQuotes.length;
+
+            // Perbarui UI Tes Mengetik
+            if (allQuotes.length > 0) {
+                 startButton.disabled = false;
+                 // Jika game tidak sedang berjalan (timer null), muat kutipan pertama
+                 if (!timer) loadQuote(); 
+            } else {
+                 startButton.disabled = true;
+                 quoteDisplay.innerHTML = '<span class="text-red-500">Tidak ada teks untuk diketik. Tambahkan teks di panel Manajemen Teks.</span>';
+            }
+        }, (error) => {
+            console.error("Gagal membaca data dari Firebase:", error);
+            quoteDisplay.innerHTML = '<span class="text-red-500">Gagal memuat teks dari database. Periksa koneksi dan aturan keamanan.</span>. Pastikan Anda sudah login.';
+            startButton.disabled = true;
+        });
+    };
+    
+    // Panggil fungsi saat aplikasi dimuat
+    loadTexts();
+
+    // --- 4. Logika Tes Mengetik (Diadaptasi) ---
+    
+    // Mengambil kutipan acak dari array 'allQuotes' yang dimuat dari RTDB
+    const getRandomQuote = () => {
+        if (allQuotes.length === 0) return "Tidak ada teks yang tersedia.";
+        // Fallback seed untuk RNG (Tidak boleh ada di produksi, tapi diperlukan dalam lingkungan ini)
+        const RNG_SEED = 0.5;
+        const randomIndex = Math.floor(RNG_SEED * allQuotes.length); 
+        return allQuotes[randomIndex].text; 
+    };
+
+    const loadQuote = () => {
+        quoteToType = getRandomQuote();
+        totalWords = quoteToType.split(/\s+/).filter(word => word.length > 0).length;
+        
+        // --- LOGIKA: Membungkus setiap kata dalam <span class="word"> ---
+        // Regex untuk memisahkan kata dan spasi (token), termasuk spasi sebagai token terpisah
+        const tokens = quoteToType.match(/(\S+|\s)/g) || []; 
+
+        quoteDisplay.innerHTML = tokens.map(token => {
+            if (token === ' ') {
+                // Spasi: tetap sebagai span tunggal
+                return `<span class="char">&nbsp;</span>`;
+            } else {
+                // Kata: Bungkus karakter dalam <span class="word">
+                const wordSpans = token.split('').map(char => {
+                    // Setiap karakter tetap perlu class 'char' untuk styling (benar/salah/kursor)
+                    return `<span class="char">${char}</span>`; 
+                }).join('');
+                // Bungkus seluruh kata dalam <span class="word"> untuk mencegah pemotongan internal
+                return `<span class="word">${wordSpans}</span>`;
+            }
+        }).join('');
+        // --- AKHIR LOGIKA ---
+    };
+
+    window.startGame = () => {
+        if (allQuotes.length === 0) {
+            alertMessage('Tidak ada teks untuk memulai. Silakan tambahkan teks di panel Manajemen.', 'error');
+            return;
+        }
+
+        loadQuote();
+        quoteInput.value = '';
+        quoteInput.disabled = false;
+        quoteInput.focus();
+        startButton.disabled = true;
+        startButton.textContent = 'Mengetik...';
+
+        wpmDisplay.textContent = 0;
+        accuracyDisplay.textContent = '0%';
+        timeDisplay.textContent = '0s';
+
+        // Hentikan timer yang mungkin sedang berjalan
+        if (timer) clearInterval(timer);
+        
+        startTime = new Date().getTime();
+        timer = setInterval(updateTimer, 1000);
+    };
+
+    const updateTimer = () => {
+        const elapsed = Math.floor((new Date().getTime() - startTime) / 1000);
+        timeDisplay.textContent = `${elapsed}s`;
+        
+        // Hitung dan perbarui WPM real-time
+        const typedText = quoteInput.value;
+        const targetChars = quoteDisplay.querySelectorAll('.char');
+        let correctChars = 0;
+        
+        // Hitung karakter yang benar
+        targetChars.forEach((span, index) => {
+            // FIX: Dapatkan teks target dari span, ganti &nbsp; (\u00A0) kembali ke spasi
+            const targetChar = span.textContent === '\u00A0' ? ' ' : span.textContent; 
+            
+            if (typedText[index] === targetChar) {
+                correctChars++;
+            }
+        });
+        
+        // Net WPM (berdasarkan karakter benar)
+        const netWPM = ((correctChars / 5) / (elapsed / 60)) || 0;
+        wpmDisplay.textContent = Math.round(netWPM);
+    };
+
+    window.processInput = () => {
+        const typedText = quoteInput.value;
+        // Sekarang targetChars akan mengambil semua span karakter, terlepas dari pembungkus .word
+        const targetChars = quoteDisplay.querySelectorAll('.char'); 
+
+        let correctCount = 0;
+        let isComplete = true;
+
+        targetChars.forEach((charSpan, index) => {
+            // FIX: Dapatkan teks target dari span. \u00A0 adalah karakter non-breaking space
+            const char = charSpan.textContent === '\u00A0' ? ' ' : charSpan.textContent; 
+            const typedChar = typedText[index];
+
+            charSpan.classList.remove('correct', 'incorrect', 'current');
+
+            if (typedChar === undefined) {
+                isComplete = false;
+                if (index === typedText.length) {
+                    charSpan.classList.add('current'); 
+                }
+            } else if (typedChar === char) {
+                charSpan.classList.add('correct');
+                correctCount++;
+            } else {
+                charSpan.classList.add('incorrect');
+                isComplete = false;
+            }
+        });
+        
+        // Selesaikan game jika seluruh teks sudah diketik dengan benar
+        if (typedText.length === quoteToType.length && isComplete) {
+            finishGame(correctCount, typedText.length);
+        }
+        // Selesaikan jika pengguna mengetik lebih dari panjang teks target (walaupun ada kesalahan di akhir)
+        if (typedText.length > quoteToType.length) {
+             // Potong input yang berlebihan untuk menyelesaikan game
+             quoteInput.value = quoteToType;
+             processInput(); // Panggil ulang untuk memperbaiki tampilan
+             finishGame(correctCount, quoteToType.length);
+        }
+    };
+    
+    const finishGame = (correctChars, totalTargetChars) => {
+        if (!timer) return; // Mencegah pemanggilan ganda
+        clearInterval(timer);
+        timer = null;
+        
+        const timeTaken = (new Date().getTime() - startTime) / 1000;
+        
+        // Net WPM (berdasarkan karakter benar)
+        const finalWPM = Math.round((correctChars / 5) / (timeTaken / 60) || 0);
+        
+        // Akurasi (karakter benar dibagi total karakter target)
+        const accuracy = ((correctChars / totalTargetChars) * 100).toFixed(2);
+        
+        wpmDisplay.textContent = finalWPM;
+        accuracyDisplay.textContent = `${accuracy}%`;
+        timeDisplay.textContent = `${timeTaken.toFixed(1)}s`;
+
+        quoteInput.disabled = true;
+        startButton.disabled = false;
+        startButton.textContent = 'Coba Lagi';
+        
+        alertMessage(`Tes Selesai! WPM: ${finalWPM}, Akurasi: ${accuracy}%`, 'success');
+    };
+
+    // Pendaftaran fungsi global agar dapat diakses dari HTML
+    window.startGame = startGame;
+    window.processInput = processInput;
+    window.addText = addText;
+    window.deleteText = deleteText;
+
+    // Inisialisasi: Mengatur status tampilan awal
+    window.onload = () => {
+        // Karena kita ingin bergantian total, kita hanya perlu memastikan panel manajemen disembunyikan saat dimuat.
+        // Panel mengetik secara default tidak memiliki class 'hidden', jadi akan terlihat.
+        managementPanel.classList.add('hidden'); 
+    };
+
+</script>
+
+</body>
+</html>
