@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Virgo Chat</title>
+    <title>Virgo Chat (Bubble Seragam)</title>
     <link rel="icon" type="image/png" href="1.png">
     <meta name="theme-color" content="#25D366" />
 <style>
@@ -378,10 +378,7 @@
             }
         });
 
-        // =======================================================
-        // REVISI FUNGSI SUBMIT MESSAGE
-        // Meningkatkan batas karakter menjadi 5000
-        // =======================================================
+        // REVISI FUNGSI SUBMIT MESSAGE (Batas karakter 5000)
         function submitMessage() {
             const message = input.value.trim();
             const MAX_LENGTH = 5000; // Batas karakter ditingkatkan
@@ -403,9 +400,7 @@
             } else if (message.length > MAX_LENGTH) {
                 showToast("Pesan terlalu panjang (maksimal " + MAX_LENGTH + " karakter).");
             }
-            // Pesan kosong (length === 0) diabaikan, yang sudah benar
         }
-        // =======================================================
 
 
         function createMessageElement(data, key) {
@@ -490,11 +485,13 @@
 
         // Logika Firebase
         let firstLoad = true;
-        const pesanRef = db.ref("pesan").limitToLast(50);
+        const pesanRef = db.ref("pesan").limitToLast(50); // Mengambil 50 pesan terakhir
 
         pesanRef.on("child_added", (snap) => {
             const data = snap.val();
             const key = snap.key;
+            
+            // Cek apakah pesan sudah ada (mencegah duplikasi saat refresh atau reconnect)
             const el = chatBox.querySelector(`[data-key="${key}"]`);
             
             if (!el) {
@@ -502,27 +499,24 @@
                 chatBox.appendChild(newEl);
             }
 
+            // Scroll ke bawah saat pesan baru masuk
             if (!firstLoad) {
+                // Scroll jika pengguna berada di dekat bagian bawah ATAU jika pesan dikirim oleh saya
                 const isUserAtBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 100;
                 if (isUserAtBottom || data.nama === username) {
                     chatBox.scrollTop = chatBox.scrollHeight;
                 }
             }
-
-            while (chatBox.children.length > 50) {
-                const first = chatBox.firstChild;
-                if (first && first.dataset.key) {
-                    first.remove();
-                }
-            }
         });
 
+        // Dipanggil sekali setelah semua data awal dimuat
         pesanRef.once("value", () => {
             chatBox.scrollTop = chatBox.scrollHeight;
             firstLoad = false;
             input.focus();
         });
 
+        // Listener untuk pesan yang dihapus (ini juga berfungsi saat pesan "terlempar" dari limitToLast)
         db.ref("pesan").on("child_removed", (snap) => {
             const key = snap.key;
             const el = chatBox.querySelector(`[data-key="${key}"]`);
